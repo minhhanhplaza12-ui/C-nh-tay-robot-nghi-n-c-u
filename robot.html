@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nghiên Cứu & Phát Triển Cánh Tay Giả BCI Điều Khiển Bằng Sóng Não</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Chosen Palette: Warm Slate, Deep Navy & Emerald Accent -->
+    <!-- Application Structure Plan: 
+         1. Header & Navigation: Cố định góc trên với các tab chức năng và nút tìm kiếm nhanh, giúp người xem dễ dàng tra cứu.
+         2. Tab 1: Tổng quan & Bối cảnh: Trình bày số liệu thực tế toàn cầu & Việt Nam, phân loại thiết bị y sinh và bài toán đặt ra.
+         3. Tab 2: Thiết kế Cơ khí & Vật liệu: Phân tích 7 cụm mô-đun, cơ chế truyền động gân ngoại lai và biểu đồ so sánh đặc tính vật liệu in 3D (PLA, ABS, Nylon).
+         4. Tab 3: Xử lý Tín hiệu & Thực nghiệm: Sơ đồ truyền dẫn 5 khâu, cơ chế eSense Attention/Meditation và biểu đồ kết quả 2 tuần huấn luyện phản hồi sinh học.
+         5. Tab 4: Thuật toán & Bộ tính Momen: Tóm lược bản chất động học thuận/nghịch, tính toán lực tĩnh và tích hợp Bộ tính toán Momen Servo tương tác theo tải trọng.
+         6. Tab 5: Định hướng Nâng cấp & Lộ trình: 5 đột phá cơ khí (khớp TPU, vi sai VGT, ly hợp LAVT), kiến trúc nhúng ESP32 độc lập, bộ mô phỏng Vùng chết (Deadband) chống trôi lệnh và lộ trình 3 giai đoạn hướng tới chuẩn AM-ULA.
+         7. Tra cứu & Hỏi đáp Nhanh: Bộ lọc từ khóa tương tác hỗ trợ sinh viên, kỹ sư và nhà nghiên cứu dễ dàng nắm bắt thông tin quan trọng.
+    -->
+    <!-- Visualization & Content Choices:
+         - Biểu đồ vật liệu in 3D: Chart.js Bar Chart so sánh tiêu chí kỹ thuật giữa PLA, ABS, Nylon.
+         - Biểu đồ thực nghiệm huấn luyện: Chart.js Bar Chart so sánh độ chính xác điều khiển trước và sau 2 tuần tập luyện eSense.
+         - Biểu đồ độ chính xác cảm biến: Chart.js Horizontal Bar Chart so sánh EEG, sEMG, Siêu âm A-mode và IMU.
+         - Bộ tính Momen tương tác: Nhập tải trọng và chiều dài cẳng tay để tính Momen uốn uốn khuỷu tay và đánh giá an toàn động cơ Servo.
+         - Bộ mô phỏng Vùng chết eSense (Deadband): Thanh trượt điều chỉnh chỉ số Chú ý (Attention 0-100) để trực quan hóa cơ chế ngắt trôi lệnh (Hold Zone 35-65).
+         - Bộ tra cứu dữ liệu nghiên cứu: Ô tìm kiếm thời gian thực tự động lọc nội dung cốt lõi.
+         - Tuyệt đối không sử dụng SVG hoặc Mermaid JS.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 620px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+            max-height: 380px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Header & Navigation Bar -->
+    <header class="bg-slate-900 text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('overview')">
+                    <span class="text-2xl">🦾</span>
+                    <div>
+                        <h1 class="text-lg font-bold leading-tight">Hệ Thống Cánh Tay Giả BCI</h1>
+                        <p class="text-xs text-slate-400">Nghiên Cứu Chuyên Sâu & Định Hướng Nâng Cấp Cơ Điện Tử</p>
+                    </div>
+                </div>
+                <!-- Navigation Links (Desktop) -->
+                <nav class="hidden md:flex space-x-1 text-sm font-medium">
+                    <button onclick="switchTab('overview')" id="nav-overview" class="tab-btn px-3 py-2 rounded-md transition text-slate-300 hover:text-white hover:bg-slate-800">Tổng quan</button>
+                    <button onclick="switchTab('mechanics')" id="nav-mechanics" class="tab-btn px-3 py-2 rounded-md transition text-slate-300 hover:text-white hover:bg-slate-800">Cơ khí & Vật liệu</button>
+                    <button onclick="switchTab('signals')" id="nav-signals" class="tab-btn px-3 py-2 rounded-md transition text-slate-300 hover:text-white hover:bg-slate-800">Tín hiệu & Thực nghiệm</button>
+                    <button onclick="switchTab('kinematics')" id="nav-kinematics" class="tab-btn px-3 py-2 rounded-md transition text-slate-300 hover:text-white hover:bg-slate-800">Thuật toán & Momen</button>
+                    <button onclick="switchTab('roadmap')" id="nav-roadmap" class="tab-btn px-3 py-2 rounded-md transition text-slate-300 hover:text-white hover:bg-slate-800">Nâng cấp & Lộ trình</button>
+                    <button onclick="switchTab('faq')" id="nav-faq" class="tab-btn px-3 py-2 rounded-md transition text-slate-300 hover:text-white hover:bg-slate-800">Tra cứu Q&A</button>
+                </nav>
+            </div>
+        </div>
+        <!-- Mobile Navigation Bar -->
+        <div class="md:hidden flex overflow-x-auto bg-slate-800 px-2 py-2 space-x-2 text-xs border-t border-slate-700 custom-scrollbar">
+            <button onclick="switchTab('overview')" id="mob-overview" class="tab-mob-btn px-3 py-1.5 rounded bg-slate-700 whitespace-nowrap">Tổng quan</button>
+            <button onclick="switchTab('mechanics')" id="mob-mechanics" class="tab-mob-btn px-3 py-1.5 rounded text-slate-300 whitespace-nowrap">Cơ khí</button>
+            <button onclick="switchTab('signals')" id="mob-signals" class="tab-mob-btn px-3 py-1.5 rounded text-slate-300 whitespace-nowrap">Tín hiệu</button>
+            <button onclick="switchTab('kinematics')" id="mob-kinematics" class="tab-mob-btn px-3 py-1.5 rounded text-slate-300 whitespace-nowrap">Thuật toán</button>
+            <button onclick="switchTab('roadmap')" id="mob-roadmap" class="tab-mob-btn px-3 py-1.5 rounded text-slate-300 whitespace-nowrap">Nâng cấp</button>
+            <button onclick="switchTab('faq')" id="mob-faq" class="tab-mob-btn px-3 py-1.5 rounded text-slate-300 whitespace-nowrap">Q&A</button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+        <!-- SECTION 1: TỔNG QUAN & BỐI CẢNH -->
+        <section id="sec-overview" class="tab-content space-y-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-2xl font-bold text-slate-900 mb-3 flex items-center gap-2">
+                    <span>🌐</span> Bối Cảnh Nghiên Cứu & Nhu Cầu Thực Tiễn
+                </h2>
+                <p class="text-slate-600 leading-relaxed text-sm sm:text-base">
+                    Sự thiếu hụt chi trên do tai nạn lao động, chiến tranh hoặc dị tật bẩm sinh đặt ra những thách thức lớn về mặt cơ sinh học và thần kinh học. Báo cáo nghiên cứu này tập trung phân tích kiến trúc hệ thống cánh tay giả điều khiển bằng giao diện não - máy (BCI) không xâm lấn chi phí thấp, nhằm mang lại khả năng vận động sinh hoạt độc lập cho người khuyết tật.
+                </p>
+            </div>
+
+            <!-- Key Metrics Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-indigo-50 border-l-4 border-indigo-600 p-4 rounded-r-lg">
+                    <div class="text-xs text-indigo-700 font-semibold uppercase tracking-wider">Toàn cầu (Stanford)</div>
+                    <div class="text-2xl font-extrabold text-indigo-900 my-1">10 Triệu</div>
+                    <div class="text-xs text-indigo-800">Người cụt chi (30% cụt chi trên)</div>
+                </div>
+                <div class="bg-emerald-50 border-l-4 border-emerald-600 p-4 rounded-r-lg">
+                    <div class="text-xs text-emerald-700 font-semibold uppercase tracking-wider">Việt Nam (UNICEF)</div>
+                    <div class="text-2xl font-extrabold text-emerald-900 my-1">2+ Triệu</div>
+                    <div class="text-xs text-emerald-800">Người gặp khó khăn nâng vật 2kg</div>
+                </div>
+                <div class="bg-amber-50 border-l-4 border-amber-600 p-4 rounded-r-lg">
+                    <div class="text-xs text-amber-700 font-semibold uppercase tracking-wider">Khối lượng Cánh tay</div>
+                    <div class="text-2xl font-extrabold text-amber-900 my-1">2.5 kg</div>
+                    <div class="text-xs text-amber-800">Mô phỏng kích thước người lớn</div>
+                </div>
+                <div class="bg-sky-50 border-l-4 border-sky-600 p-4 rounded-r-lg">
+                    <div class="text-xs text-sky-700 font-semibold uppercase tracking-wider">Hiệu quả Huấn luyện</div>
+                    <div class="text-2xl font-extrabold text-sky-900 my-1">28% → 79%</div>
+                    <div class="text-xs text-sky-800">Cải thiện sau 2 tuần tập eSense</div>
+                </div>
+            </div>
+
+            <!-- Classification & Limitations -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+                        <span>🧩</span> Phân Loại Thiết Bị Hỗ Trợ Y Sinh
+                    </h3>
+                    <ul class="space-y-3 text-sm text-slate-600">
+                        <li class="flex items-start gap-2">
+                            <span class="text-indigo-600 font-bold">•</span>
+                            <div>
+                                <strong class="text-slate-800">Thay thế chức năng (Prosthetics):</strong> Bù đắp trực tiếp phần chi thể bị mất (tay/chân giả, xe lăn điện) để duy trì hoạt động sinh hoạt cá nhân hằng ngày.
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-indigo-600 font-bold">•</span>
+                            <div>
+                                <strong class="text-slate-800">Phục hồi chức năng (Rehabilitation):</strong> Robot ngoại khung (Exoskeleton) hỗ trợ tập vận động chủ động/thụ động cho bệnh nhân sau đột quỵ hoặc chấn thương tủy sống.
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+                        <span>⚠️</span> Giới Hạn Của Giải Pháp Truyền Thống
+                    </h3>
+                    <ul class="space-y-2 text-sm text-slate-600">
+                        <li class="bg-slate-50 p-2.5 rounded border border-slate-100">
+                            <strong>Chân giả điều khiển PID:</strong> Chỉ hỗ trợ bước đi chu kỳ thụ động, không phản ứng linh hoạt khi vượt chướng ngại vật hoặc leo cầu thang.
+                        </li>
+                        <li class="bg-slate-50 p-2.5 rounded border border-slate-100">
+                            <strong>Điều khiển bằng cử chỉ đầu / mắt:</strong> Dễ gây mỏi cơ cổ, mỏi mắt, chóng mặt và bị giới hạn số lượng câu lệnh độc lập.
+                        </li>
+                        <li class="bg-slate-50 p-2.5 rounded border border-slate-100">
+                            <strong>Tay giả thương mại (i-Limb, BeBionic):</strong> Giá thành quá cao (&gt;$30,000), hệ thống đóng (Closed-source), khó nâng cấp và thay thế linh kiện.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: CƠ KHÍ & VẬT LIỆU -->
+        <section id="sec-mechanics" class="tab-content hidden space-y-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-2xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+                    <span>⚙️</span> Nguyên Lý Cấu Tạo Cơ Khí & Vật Liệu
+                </h2>
+                <p class="text-slate-600 leading-relaxed text-sm">
+                    Kiến trúc cơ khí cánh tay giả được phân rã thành 7 cụm mô-đun chức năng, ứng dụng nguyên lý truyền động dây gân ngoại lai (Extrinsic Tendon) kết hợp hệ thống bánh răng giảm tốc và vật liệu in 3D FDM tối ưu.
+                </p>
+            </div>
+
+            <!-- 7 Modules Breakdown & Tendon Mechanism -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- 7 Modules List -->
+                <div class="lg:col-span-1 bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                    <h3 class="font-bold text-slate-900 border-b pb-2 text-base">7 Cụm Mô-đun Chức Năng Cốt Lõi</h3>
+                    <div class="space-y-2 text-xs text-slate-700">
+                        <div class="p-2 bg-slate-50 rounded border border-slate-200 font-medium flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">1</span>
+                            Cụm bắp tay (Upper arm shell)
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border border-slate-200 font-medium flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">2</span>
+                            Cụm khớp khuỷu tay (Gập/duỗi 110°)
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border border-slate-200 font-medium flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">3</span>
+                            Thân cẳng tay & Khoang động cơ Servo
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border border-slate-200 font-medium flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">4</span>
+                            Khớp cổ tay & Khung lòng bàn tay
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border border-slate-200 font-medium flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">5</span>
+                            Cụm 4 ngón tay dài (3 đốt/ngón)
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border border-slate-200 font-medium flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">6</span>
+                            Cụm ngón tay cái đối diện
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border border-slate-200 font-medium flex items-center gap-2">
+                            <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px]">7</span>
+                            Hệ thống dây gân Siêu bền & Puly dẫn hướng
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tendon Mechanism & Gear Reduction -->
+                <div class="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                    <h3 class="font-bold text-slate-900 border-b pb-2 text-base">Cơ Chế Truyền Động Dây Gân Ngoại Lai (Extrinsic Tendon)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                        <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                            <strong class="text-indigo-900 block mb-1">Dây gân vòng kín</strong>
+                            Luồn qua các lỗ định hướng xuyên tâm trong từng đốt ngón tay, kết nối với Puly Servo ở cổ tay để thực hiện gập/nhả ngón mượt mà.
+                        </div>
+                        <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                            <strong class="text-indigo-900 block mb-1">Khe khóa đầu ngón</strong>
+                            Neo chặt sợi dây gân tại đốt xa. Khi kéo dây, momen tập trung làm gập tuần tự các khớp từ đốt gần đến đốt xa.
+                        </div>
+                        <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                            <strong class="text-indigo-900 block mb-1">Bánh răng giảm tốc 3:1</strong>
+                            Đặt tại khớp khuỷu tay. Tăng momen xoắn đầu ra của Servo lên 3 lần, đáp ứng khả năng nâng hạ bắp tay nặng 2.5 kg.
+                        </div>
+                    </div>
+
+                    <!-- Material Choice Chart Container -->
+                    <div class="mt-4 pt-2 border-t">
+                        <h4 class="text-xs font-bold uppercase text-slate-500 mb-2">So sánh Đặc tính Vật liệu In 3D (Đã chọn: Nhựa PLA)</h4>
+                        <div class="chart-container">
+                            <canvas id="materialChartCanvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: TÍN HIỆU & THỰC NGHIỆM -->
+        <section id="sec-signals" class="tab-content hidden space-y-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-2xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+                    <span>🧠</span> Thu Thập Tín Hiệu Sóng Não & Kết Quả Thực Nghiệm
+                </h2>
+                <p class="text-slate-600 leading-relaxed text-sm">
+                    Sử dụng cảm biến không xâm lấn NeuroSky MindWave Mobile 2 trích xuất hai chỉ số trạng thái eSense: <strong>Attention</strong> (Chú ý / Tập trung) và <strong>Meditation</strong> (Thiền định / Thả lỏng).
+                </p>
+            </div>
+
+            <!-- Pipeline Diagram (Pure HTML/CSS) -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-900 mb-4 text-sm uppercase tracking-wider">Chuỗi Truyền Dẫn Tín Hiệu Không Dây 5 Khâu</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 text-center text-xs">
+                    <div class="bg-slate-100 p-3 rounded border border-slate-200 flex flex-col items-center justify-center">
+                        <span class="text-xl mb-1">🎧</span>
+                        <strong class="text-slate-800">Cảm biến EEG</strong>
+                        <span class="text-slate-500 text-[10px]">NeuroSky MindWave 2</span>
+                    </div>
+                    <div class="bg-indigo-50 p-3 rounded border border-indigo-200 flex flex-col items-center justify-center">
+                        <span class="text-xl mb-1">📶</span>
+                        <strong class="text-indigo-900">Bluetooth</strong>
+                        <span class="text-indigo-600 text-[10px]">Đến Máy tính / MATLAB</span>
+                    </div>
+                    <div class="bg-slate-100 p-3 rounded border border-slate-200 flex flex-col items-center justify-center">
+                        <span class="text-xl mb-1">🔌</span>
+                        <strong class="text-slate-800">FTDI232 (USB-UART)</strong>
+                        <span class="text-slate-500 text-[10px]">Nối sang Arduino 1</span>
+                    </div>
+                    <div class="bg-emerald-50 p-3 rounded border border-emerald-200 flex flex-col items-center justify-center">
+                        <span class="text-xl mb-1">📡</span>
+                        <strong class="text-emerald-900">RF NRF24L01 (2.4GHz)</strong>
+                        <span class="text-emerald-600 text-[10px]">Truyền không dây 30-50m</span>
+                    </div>
+                    <div class="bg-slate-100 p-3 rounded border border-slate-200 flex flex-col items-center justify-center">
+                        <span class="text-xl mb-1">🦾</span>
+                        <strong class="text-slate-800">Arduino 2 & Servo</strong>
+                        <span class="text-slate-500 text-[10px]">Xuất xung PWM khớp</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Experimental Results Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Experimental Chart -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-slate-900 mb-2 text-base">Hiệu Quả Điều Khiển (Trước vs Sau 2 Tuần Huấn Luyện)</h3>
+                    <p class="text-xs text-slate-500 mb-4">Thực nghiệm trên 80 lần thử (4 động tác x 20 lần) trong cửa sổ thời gian 5 giây.</p>
+                    <div class="chart-container">
+                        <canvas id="trainingChartCanvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Paradoxes & Key Insights -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                    <h3 class="font-bold text-slate-900 border-b pb-2 text-base">3 Phát Hiện Cơ Chế Tương Tác Người - Máy</h3>
+                    
+                    <div class="space-y-3 text-xs text-slate-700">
+                        <div class="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                            <strong class="text-amber-900 block font-semibold mb-1">1. Phụ thuộc thích nghi thần kinh (Neuroplasticity)</strong>
+                            Tỷ lệ thành công ban đầu chỉ đạt 28%. Sau 2 tuần rèn luyện phản hồi sinh học (Biofeedback) 30 phút/ngày, tỷ lệ thành công tổng thể tăng vọt lên <strong>79%</strong>.
+                        </div>
+                        <div class="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                            <strong class="text-emerald-900 block font-semibold mb-1">2. Thiền định (Meditation) dễ khống chế hơn Chú ý (Attention)</strong>
+                            Xoay cổ tay bằng Meditation đạt kết quả cao hơn (90% & 75%) so với gập/mở khuỷu tay bằng Attention (85% & 65%) do trạng thái tĩnh tâm dễ duy trì ổn định hơn.
+                        </div>
+                        <div class="p-3 bg-rose-50 rounded-lg border border-rose-200">
+                            <strong class="text-rose-900 block font-semibold mb-1">3. Bất cập cắt ngưỡng nhị phân 40 (Cần loại bỏ)</strong>
+                            Gán lệnh đối xứng qua mốc 40 (&gt;40 gập, &lt;40 mở) khiến cánh tay hoạt động liên tục, thiếu "vùng nghỉ". Ép hạ Attention &lt;40 gây tâm lý căng thẳng ngược lại.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: THUẬT TOÁN ĐƠN GIẢN HÓA -->
+        <section id="sec-kinematics" class="tab-content hidden space-y-8">
+            <div class="bg-emerald-900 text-white p-6 rounded-xl shadow-md">
+                <div class="inline-block px-2.5 py-1 bg-emerald-700 text-emerald-100 text-xs font-bold rounded mb-2">
+                    Nội dung Tóm gọn & Đơn giản hóa
+                </div>
+                <h2 class="text-2xl font-bold mb-2 flex items-center gap-2">
+                    <span>📐</span> Bản Chất Thuật Toán Động Học & Động Lực Học
+                </h2>
+                <p class="text-emerald-100 text-sm leading-relaxed">
+                    Toàn bộ các ma trận biến đổi cồng kềnh được giản lược về bản chất vật lý cốt lõi: xác định không gian hoạt động của bàn tay và tính chọn công suất động cơ Servo theo tải trọng tĩnh.
+                </p>
+            </div>
+
+            <!-- Simplified Concept Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Forward Kinematics -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                    <div class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Khâu 1</div>
+                    <h3 class="font-bold text-slate-900 text-lg">Động Học Thuận</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Cho biết góc quay của các động cơ Servo (θ1, θ2, θ3) &rarr; Suy ra vị trí chính xác của đầu ngón tay (Px, Py, Pz) trong không gian 3D.
+                    </p>
+                    <div class="p-2.5 bg-slate-50 rounded text-xs font-mono text-slate-700 border border-slate-200">
+                        Px = S1 · d2<br>
+                        Py = -C1 · d2<br>
+                        Pz = d1 (với d1=230mm, d2=50mm)
+                    </div>
+                </div>
+
+                <!-- Inverse Kinematics -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                    <div class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Khâu 2</div>
+                    <h3 class="font-bold text-slate-900 text-lg">Động Học Nghịch</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Khi muốn đưa tay tới tọa độ (Px, Py, Pz) để cầm vật &rarr; Thuật toán tính ngược lại các góc quay cần thiết cho từng Servo.
+                    </p>
+                    <div class="p-2.5 bg-slate-50 rounded text-xs font-mono text-slate-700 border border-slate-200">
+                        [θ1, θ2, θ3] = Inverse_DH(Px, Py, Pz)
+                    </div>
+                </div>
+
+                <!-- Static Force & Servo Selection -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                    <div class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Khâu 3</div>
+                    <h3 class="font-bold text-slate-900 text-lg">Lực Tĩnh & Chọn Servo</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Xét góc duỗi ngang chịu tải nặng nhất. Xác định lực tĩnh cực đại tại khuỷu Fmax = 15 N để tính Momen chọn động cơ.
+                    </p>
+                    <div class="p-2.5 bg-slate-50 rounded text-xs text-slate-700 border border-slate-200 space-y-1">
+                        <div>• Servo 1 (Khuỷu): <strong class="text-indigo-600">MG995 (15 kg·cm)</strong></div>
+                        <div>• Servo 2 (Cổ/Ngón): <strong class="text-indigo-600">MG996R (3.5 kg·cm)</strong></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Torque Calculator -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-900 mb-2 text-base flex items-center gap-2">
+                    <span>🧮</span> Bộ Tính Toán Momen Động Cơ Servo Theo Tải Trọng Thực Tế
+                </h3>
+                <p class="text-xs text-slate-500 mb-4">Thay đổi trọng lượng vật cần nâng để xem Momen uốn yêu cầu tại khớp khuỷu và kiểm tra điều kiện an toàn của động cơ Servo.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                    <div class="space-y-4 text-xs">
+                        <div>
+                            <label class="font-semibold text-slate-700 block mb-1">Khối lượng vật nâng (kg): <span id="weight-val" class="text-indigo-600 font-bold">0.5 kg</span></label>
+                            <input type="range" id="weight-input" min="0.1" max="2.0" step="0.1" value="0.5" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" oninput="updateTorqueCalc()">
+                        </div>
+                        <div>
+                            <label class="font-semibold text-slate-700 block mb-1">Chiều dài cẳng tay (cm): <span id="length-val" class="text-indigo-600 font-bold">28 cm</span></label>
+                            <input type="range" id="length-input" min="15" max="35" step="1" value="28" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" oninput="updateTorqueCalc()">
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 text-xs space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-slate-600">Momen uốn tĩnh cản khuỷu tay:</span>
+                            <strong id="res-bending-torque" class="text-slate-900">14.00 kg·cm</strong>
+                        </div>
+                        <div class="flex justify-between border-b pb-2">
+                            <span class="text-slate-600">Momen cần thiết trên trục Servo (Tỉ số bánh răng 3:1):</span>
+                            <strong id="res-servo-torque" class="text-indigo-600 font-bold">4.67 kg·cm</strong>
+                        </div>
+                        <div class="pt-1 flex items-center justify-between">
+                            <span class="text-slate-600">Đánh giá khả năng Servo MG995 (15 kg·cm):</span>
+                            <span id="res-servo-status" class="px-2 py-0.5 rounded font-bold text-emerald-700 bg-emerald-100">AN TOÀN (Đạt yêu cầu)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 5: NÂNG CẤP & LỘ TRÌNH -->
+        <section id="sec-roadmap" class="tab-content hidden space-y-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-2xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+                    <span>🚀</span> Đề Xuất Phát Triển Mở Rộng & Lộ Trình 3 Giai Đoạn
+                </h2>
+                <p class="text-slate-600 leading-relaxed text-sm">
+                    Để đưa hệ thống từ nguyên mẫu phòng thí nghiệm thành sản phẩm y sinh đạt chuẩn quốc tế <strong>AM-ULA</strong> (18 tác vụ sinh hoạt), các cải tiến đột phá được đề xuất toàn diện.
+                </p>
+            </div>
+
+            <!-- 5 Mechanical Innovations -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-900 mb-3 text-base">5 Đột Phá Đổi Mới Cấu Tạo Cơ Khí</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
+                        <strong class="text-indigo-900 block font-semibold">1. Khớp bản lề đàn hồi TPU màng 0.5mm</strong>
+                        <span>In 3D nguyên khối, chống xoắn ngang gấp 2 lần, tự khôi phục vị trí mà không cần dây gân nhả. Giảm khối lượng bàn tay còn 253g.</span>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
+                        <strong class="text-indigo-900 block font-semibold">2. Bộ chia lực vi sai VGT / CDM (17g)</strong>
+                        <span>Tự động điều tiết lực kéo thích ứng theo hình dáng lồi lõm của vật thể (Shape-adaptive grasping).</span>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
+                        <strong class="text-indigo-900 block font-semibold">3. Cơ cấu khuếch đại lực LAVT &amp; Ly hợp trượt</strong>
+                        <span>Tự khóa cứng cơ cấu khi đã kẹp chặt. Cho phép ngắt điện Servo mà vẫn giữ vật, tiết kiệm pin tối đa.</span>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
+                        <strong class="text-indigo-900 block font-semibold">4. Ngón cái đối diện 2 Bậc tự do</strong>
+                        <span>Đáp ứng trọn vẹn 3 kiểu nắm chuẩn AM-ULA: Nắm chặt (Power), Kẹp 2 ngón (Pinch) và Kẹp 3 ngón (Tripod).</span>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
+                        <strong class="text-indigo-900 block font-semibold">5. Vật liệu PA6-CF &amp; Ổ mỏm cụt Silicone</strong>
+                        <span>Chuyển sang nhựa composite gia cường sợi carbon PA6-CF. Tích hợp ổ mỏm cụt hút chân không êm ái. Giảm tổng khối lượng &lt; 1.2kg.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Standalone Electronics & Deadband Simulator -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Embedded Hardware -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                    <h3 class="font-bold text-slate-900 border-b pb-2 text-base">Kiến Trúc Nhúng Độc Lập ESP32 &amp; Phản Hồi Xúc Giác</h3>
+                    <ul class="space-y-2 text-xs text-slate-700">
+                        <li class="flex items-start gap-2">
+                            <span class="text-emerald-600 font-bold">✓</span>
+                            <div><strong>ESP32 Độc Lập:</strong> Tích hợp Bluetooth nhận EEG trực tiếp từ NeuroSky, loại bỏ hoàn toàn máy tính cố định và Arduino trung gian.</div>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-emerald-600 font-bold">✓</span>
+                            <div><strong>Màn Hình Cảm Ứng Nextion:</strong> Gắn ngay cẳng tay để theo dõi pin, chỉ số sóng não và chọn chế độ vận hành.</div>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-emerald-600 font-bold">✓</span>
+                            <div><strong>Cảm Biến Lực FSR400 &amp; Rung Haptic:</strong> Đo lực bóp thực tế tại đầu ngón tay và truyền xung rung về bắp tay người đeo để cảm nhận độ cứng vật phẩm.</div>
+                        </li>
+                    </ul>
+
+                    <!-- Modality Chart -->
+                    <div class="pt-2">
+                        <h4 class="text-xs font-bold uppercase text-slate-500 mb-2">Độ Chính Xác Các Phương Thức Cảm Biến Sinh Học</h4>
+                        <div class="chart-container" style="height: 200px;">
+                            <canvas id="sensorChartCanvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive Deadband Simulator -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                    <h3 class="font-bold text-slate-900 text-base">Mô Phỏng Vùng Chết (Deadband Zone 35–65) Anti-Jitter</h3>
+                    <p class="text-xs text-slate-500">Kéo thanh điều chỉnh sóng Attention để xem cơ chế giữ vị trí mượt mà, khắc phục lỗi rung giật lệnh.</p>
+
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="font-semibold text-slate-700 block mb-1">Chỉ số Attention (eSense 0–100): <span id="sim-att-val" class="text-indigo-600 font-bold">50</span></label>
+                            <input type="range" id="sim-att-input" min="0" max="100" value="50" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" oninput="updateDeadbandSim()">
+                        </div>
+
+                        <div class="p-4 rounded-lg text-center transition-all duration-300" id="sim-status-box">
+                            <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Trạng Thái Hệ Thống</div>
+                            <div id="sim-status-title" class="text-lg font-extrabold text-slate-800">VÙNG NGHỈ GIỮ VỊ TRÍ (Hold Deadband)</div>
+                            <div id="sim-status-desc" class="text-xs mt-1 text-slate-600">Tín hiệu nằm trong khoảng 35–65. Động cơ khóa vị trí, ngắt dòng nuôi giúp cánh tay không bị rung lắc.</div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-1 text-[10px] text-center font-semibold">
+                            <div class="p-1.5 bg-rose-100 text-rose-800 rounded">0 - 35: Mở Khuỷu</div>
+                            <div class="p-1.5 bg-slate-200 text-slate-800 rounded">35 - 65: Vùng Nghỉ (Hold)</div>
+                            <div class="p-1.5 bg-emerald-100 text-emerald-800 rounded">65 - 100: Gập Khuỷu</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3-Phase Deployment Roadmap -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-900 mb-4 text-base">Lộ Trình Triển Khai Thực Tế 3 Giai Đoạn</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div class="p-4 bg-indigo-50 border-t-4 border-indigo-600 rounded-b-lg">
+                        <strong class="text-indigo-900 block font-bold text-sm mb-1">Giai Đoạn 1: Tối Ưu Cơ Khí</strong>
+                        <p class="text-slate-600">Chuyển sang ngón TPU nguyên khối, tích hợp vi sai VGT/CDM, bộ khóa LAVT và khung PA6-CF kèm socket Silicone.</p>
+                    </div>
+                    <div class="p-4 bg-emerald-50 border-t-4 border-emerald-600 rounded-b-lg">
+                        <strong class="text-emerald-900 block font-bold text-sm mb-1">Giai Đoạn 2: Nhúng Độc Lập</strong>
+                        <p class="text-slate-600">Thay máy tính bằng ESP32, màn hình Nextion cẳng tay, cảm biến lực FSR400 và mô-tơ rung phản hồi xúc giác.</p>
+                    </div>
+                    <div class="p-4 bg-sky-50 border-t-4 border-sky-600 rounded-b-lg">
+                        <strong class="text-sky-900 block font-bold text-sm mb-1">Giai Đoạn 3: Điều Khiển Lai</strong>
+                        <p class="text-slate-600">Kết hợp sóng não EEG (chọn mode) với dải Cơ đồ lực FMG/sEMG (kích hoạt tỷ lệ), đáp ứng chuẩn AM-ULA không cần tập luyện lâu.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 6: TRA CỨU Q&A NHANH -->
+        <section id="sec-faq" class="tab-content hidden space-y-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <span>🔍</span> Tra Cứu Kiến Thức & Giải Đáp Nhanh
+                </h2>
+                <p class="text-slate-600 text-sm">
+                    Nhập từ khóa tìm kiếm để lọc nhanh thông tin trong báo cáo nghiên cứu (Ví dụ: <em>PLA, Servo, EEG, eSense, TPU, Deadband, AM-ULA</em>).
+                </p>
+
+                <div class="relative">
+                    <input type="text" id="faq-search" onkeyup="filterFAQ()" placeholder="Nhập từ khóa tìm kiếm..." class="w-full pl-4 pr-10 py-2.5 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <span class="absolute right-3 top-3 text-slate-400">🔎</span>
+                </div>
+
+                <div id="faq-list" class="space-y-3 pt-2">
+                    <div class="faq-item p-4 bg-slate-50 rounded-lg border border-slate-200">
+                        <h3 class="font-bold text-slate-900 text-sm mb-1">Cánh tay giả BCI hoạt động dựa trên cơ chế nào?</h3>
+                        <p class="text-xs text-slate-600">Sử dụng cảm biến EEG NeuroSky MindWave Mobile 2 trích xuất chỉ số eSense Attention và Meditation, chuyển đổi qua Bluetooth, NRF24L01 và vi điều khiển Arduino/ESP32 để điều khiển động cơ Servo kéo gân tay.</p>
+                    </div>
+                    <div class="faq-item p-4 bg-slate-50 rounded-lg border border-slate-200">
+                        <h3 class="font-bold text-slate-900 text-sm mb-1">Tại sao lại chọn nhựa PLA thay vì ABS hay Nylon cho mô hình ban đầu?</h3>
+                        <p class="text-xs text-slate-600">Nhựa PLA có độ chính xác kích thước cao (95%), không bị cong vênh khi in FDM, an toàn sinh học và chi phí thấp, phù hợp tạo mẫu nhanh trong phòng thí nghiệm.</p>
+                    </div>
+                    <div class="faq-item p-4 bg-slate-50 rounded-lg border border-slate-200">
+                        <h3 class="font-bold text-slate-900 text-sm mb-1">Vùng chết Deadband (35-65) giúp giải quyết vấn đề gì?</h3>
+                        <p class="text-xs text-slate-600">Khắc phục hiện tượng rung giật lệnh liên tục do nhiễu tín hiệu sóng não gây ra. Khi Attention nằm trong khoảng 35-65, động cơ sẽ giữ nguyên vị trí và ngắt dòng nuôi để tiết kiệm điện.</p>
+                    </div>
+                    <div class="faq-item p-4 bg-slate-50 rounded-lg border border-slate-200">
+                        <h3 class="font-bold text-slate-900 text-sm mb-1">Mô-đun vi sai VGT / CDM có tác dụng gì trong thiết kế nâng cấp?</h3>
+                        <p class="text-xs text-slate-600">Giúp các ngón tay tự động phân bổ lực kéo thích ứng theo hình dáng thực tế của vật thể được gắp (Shape-adaptive grasping), tránh làm rơi hoặc đè nát vật mềm.</p>
+                    </div>
+                    <div class="faq-item p-4 bg-slate-50 rounded-lg border border-slate-200">
+                        <h3 class="font-bold text-slate-900 text-sm mb-1">Tiêu chuẩn AM-ULA đòi hỏi cánh tay giả đạt những yêu cầu gì?</h3>
+                        <p class="text-xs text-slate-600">AM-ULA bao gồm 18 tác vụ sinh hoạt hằng ngày (như mở cửa, cầm ly nước, cầm chìa khóa, đánh răng, v.v.). Lộ trình nâng cấp hướng tới đáp ứng toàn bộ các tác vụ này.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 text-xs py-6 mt-12 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 text-center space-y-2">
+            <p>Báo Cáo Nghiên Cứu Chuyên Sâu &amp; Định Hướng Phát Triển Cánh Tay Giả Điều Khiển Bằng Sóng Não (BCI)</p>
+            <p class="text-slate-500">Ứng dụng Web Tương Tác Nghiên Cứu Cơ Điện Tử &amp; Y Sinh | 2026</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Tab Switcher Logic
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-slate-800', 'text-white');
+                btn.classList.add('text-slate-300');
+            });
+            document.querySelectorAll('.tab-mob-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white');
+                btn.classList.add('bg-slate-700', 'text-slate-300');
+            });
+
+            const targetSec = document.getElementById('sec-' + tabId);
+            if (targetSec) targetSec.classList.remove('hidden');
+
+            const activeNav = document.getElementById('nav-' + tabId);
+            if (activeNav) {
+                activeNav.classList.add('bg-slate-800', 'text-white');
+                activeNav.classList.remove('text-slate-300');
+            }
+            const activeMob = document.getElementById('mob-' + tabId);
+            if (activeMob) {
+                activeMob.classList.add('bg-indigo-600', 'text-white');
+                activeMob.classList.remove('bg-slate-700', 'text-slate-300');
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Torque Calculator Logic
+        function updateTorqueCalc() {
+            const weight = parseFloat(document.getElementById('weight-input').value);
+            const length = parseFloat(document.getElementById('length-input').value);
+
+            document.getElementById('weight-val').innerText = weight.toFixed(1) + ' kg';
+            document.getElementById('length-val').innerText = length + ' cm';
+
+            const bendingTorque = weight * length;
+            const servoTorque = bendingTorque / 3;
+
+            document.getElementById('res-bending-torque').innerText = bendingTorque.toFixed(2) + ' kg·cm';
+            document.getElementById('res-servo-torque').innerText = servoTorque.toFixed(2) + ' kg·cm';
+
+            const statusEl = document.getElementById('res-servo-status');
+            if (servoTorque <= 11.5) {
+                statusEl.innerText = 'AN TOÀN (MG995 đáp ứng tốt)';
+                statusEl.className = 'px-2 py-0.5 rounded font-bold text-emerald-700 bg-emerald-100';
+            } else if (servoTorque <= 15.0) {
+                statusEl.innerText = 'CẢNH BÁO (Gần giới hạn 15 kg·cm)';
+                statusEl.className = 'px-2 py-0.5 rounded font-bold text-amber-700 bg-amber-100';
+            } else {
+                statusEl.innerText = 'QUÁ TẢI (Vượt công suất MG995)';
+                statusEl.className = 'px-2 py-0.5 rounded font-bold text-rose-700 bg-rose-100';
+            }
+        }
+
+        // Deadband Simulator Logic
+        function updateDeadbandSim() {
+            const val = parseInt(document.getElementById('sim-att-input').value);
+            document.getElementById('sim-att-val').innerText = val;
+
+            const box = document.getElementById('sim-status-box');
+            const title = document.getElementById('sim-status-title');
+            const desc = document.getElementById('sim-status-desc');
+
+            if (val > 65) {
+                box.className = 'p-4 rounded-lg text-center bg-emerald-100 border border-emerald-300 transition-all duration-300';
+                title.innerText = 'GẬP KHUỶU TAY (Flexion)';
+                title.className = 'text-lg font-extrabold text-emerald-900';
+                desc.innerText = 'Attention ≥ 65. Xung PWM kích hoạt động cơ gập cánh tay lên.';
+            } else if (val < 35) {
+                box.className = 'p-4 rounded-lg text-center bg-rose-100 border border-rose-300 transition-all duration-300';
+                title.innerText = 'MỞ KHUỶU TAY (Extension)';
+                title.className = 'text-lg font-extrabold text-rose-900';
+                desc.innerText = 'Attention ≤ 35. Xung PWM kích hoạt động cơ duỗi cánh tay ra.';
+            } else {
+                box.className = 'p-4 rounded-lg text-center bg-slate-100 border border-slate-300 transition-all duration-300';
+                title.innerText = 'VÙNG NGHỈ GIỮ VỊ TRÍ (Hold Deadband)';
+                title.className = 'text-lg font-extrabold text-slate-800';
+                desc.innerText = 'Tín hiệu nằm trong khoảng 35–65. Động cơ khóa vị trí, ngắt dòng nuôi giúp cánh tay không bị rung lắc.';
+            }
+        }
+
+        // FAQ Filter Logic
+        function filterFAQ() {
+            const input = document.getElementById('faq-search').value.toLowerCase();
+            const items = document.querySelectorAll('.faq-item');
+            items.forEach(item => {
+                const text = item.innerText.toLowerCase();
+                if (text.includes(input)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        // Initialize Charts on DOM Ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. Material Chart
+            const matCtx = document.getElementById('materialChartCanvas').getContext('2d');
+            new Chart(matCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Độ chính xác kích thước', 'Độ bền cơ lý', 'An toàn sức khỏe', 'Dễ gia công', 'Chi phí tiết kiệm'],
+                    datasets: [
+                        {
+                            label: 'Nhựa PLA (Được chọn)',
+                            data: [95, 70, 95, 90, 95],
+                            backgroundColor: 'rgba(16, 185, 129, 0.85)'
+                        },
+                        {
+                            label: 'Nhựa ABS',
+                            data: [70, 85, 50, 75, 90],
+                            backgroundColor: 'rgba(239, 68, 68, 0.6)'
+                        },
+                        {
+                            label: 'Nhựa Nylon',
+                            data: [60, 90, 85, 50, 30],
+                            backgroundColor: 'rgba(99, 102, 241, 0.6)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, max: 100 }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // 2. Training Chart
+            const trainCtx = document.getElementById('trainingChartCanvas').getContext('2d');
+            new Chart(trainCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Xoay cổ trái (Med>40)', 'Xoay cổ phải (Med<40)', 'Gập khuỷu (Att>40)', 'Mở khuỷu (Att<40)', 'TRUNG BÌNH TOÀN ĐỘI'],
+                    datasets: [
+                        {
+                            label: 'Trước tập luyện (%)',
+                            data: [15, 50, 20, 25, 28],
+                            backgroundColor: 'rgba(148, 163, 184, 0.8)'
+                        },
+                        {
+                            label: 'Sau 2 tuần tập (%)',
+                            data: [90, 75, 85, 65, 79],
+                            backgroundColor: 'rgba(79, 70, 229, 0.9)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, max: 100 }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // 3. Sensor Modality Chart
+            const sensorCtx = document.getElementById('sensorChartCanvas').getContext('2d');
+            new Chart(sensorCtx, {
+                type: 'bar',
+                indexAxis: 'y',
+                data: {
+                    labels: ['EEG (NeuroSky)', 'EEG (TCSP Alg)', 'sEMG (Cơ điện)', 'Siêu âm A-mode', 'Cảm biến Vai IMU'],
+                    datasets: [{
+                        label: 'Độ chính xác phân loại (%)',
+                        data: [79.0, 84.0, 80.5, 91.0, 89.0],
+                        backgroundColor: [
+                            'rgba(148, 163, 184, 0.8)',
+                            'rgba(99, 102, 241, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(16, 185, 129, 0.9)',
+                            'rgba(14, 165, 233, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { beginAtZero: true, max: 100 }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // Default Active Tab
+            switchTab('overview');
+        });
+    </script>
+</body>
+</html>
